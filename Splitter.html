@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Split the Hardcopy — ES/EN PDF Splitter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --ink: #141B2B;
+    --ink-panel: #1C2540;
+    --ink-panel-hi: #232E52;
+    --stub: #F5EFE1;
+    --stub-dim: #E8DFC9;
+    --gold: #C79A48;
+    --gold-dim: #8E703A;
+    --es: #B2532E;
+    --en: #3C6E91;
+    --text-lo: #C7CCDA;
+    --text-hi: #F3F1EA;
+    --ink-text: #241B12;
+    --ink-text-dim: #5E543F;
+    --radius: 3px;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --sans: 'IBM Plex Sans', system-ui, sans-serif;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--ink);
+    background-image:
+      radial-gradient(ellipse at top left, rgba(199,154,72,0.07), transparent 55%),
+      radial-gradient(ellipse at bottom right, rgba(60,110,145,0.08), transparent 55%);
+    color: var(--text-hi);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 40px 20px 80px;
+  }
+  a{ color: inherit; }
+  .wrap{ max-width: 880px; margin: 0 auto; }
+
+  /* ---- header ---- */
+  .eyebrow{
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin: 0 0 10px;
+  }
+  h1{
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: clamp(28px, 4.5vw, 40px);
+    line-height: 1.1;
+    margin: 0 0 12px;
+    color: var(--text-hi);
+  }
+  .sub{
+    color: var(--text-lo);
+    font-size: 15px;
+    line-height: 1.55;
+    max-width: 58ch;
+    margin: 0 0 36px;
+  }
+
+  /* ---- card ---- */
+  .card{
+    background: var(--ink-panel);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin-bottom: 24px;
+  }
+  .card + .card{ margin-top: 0; }
+
+  /* ---- dropzone ---- */
+  .dropzone{
+    border: 1.5px dashed rgba(199,154,72,0.45);
+    border-radius: var(--radius);
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+    background: rgba(199,154,72,0.03);
+  }
+  .dropzone:hover, .dropzone.drag{
+    border-color: var(--gold);
+    background: rgba(199,154,72,0.08);
+  }
+  .dropzone:focus-visible{
+    outline: 2px solid var(--gold);
+    outline-offset: 3px;
+  }
+  .dropzone .dz-title{
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    color: var(--text-hi);
+    margin-bottom: 6px;
+  }
+  .dropzone .dz-sub{
+    font-size: 13px;
+    color: var(--text-lo);
+  }
+  input[type="file"]{ display:none; }
+
+  .file-chip{
+    display:flex; align-items:center; justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-hi);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin-top: 16px;
+  }
+  .file-chip button{
+    background: none; border: none; color: var(--text-lo);
+    font-family: var(--mono); font-size: 12px; cursor: pointer;
+    text-decoration: underline;
+  }
+  .file-chip button:hover{ color: var(--text-hi); }
+
+  .error-msg{
+    margin-top: 14px;
+    font-size: 13px;
+    color: #E8B4A0;
+    background: rgba(178,83,46,0.12);
+    border: 1px solid rgba(178,83,46,0.4);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+  }
+  .hidden{ display:none !important; }
+
+  /* ---- preview stage ---- */
+  .stage-head{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin-bottom: 16px; flex-wrap: wrap; gap: 10px;
+  }
+  .stage-head h2{
+    font-family: var(--mono);
+    font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--text-lo); margin: 0; font-weight: 500;
+  }
+  .pagenav{
+    display:flex; align-items:center; gap: 10px;
+    font-family: var(--mono); font-size: 12px; color: var(--text-lo);
+  }
+  .pagenav button{
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-hi);
+    width: 26px; height: 26px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: var(--mono);
+  }
+  .pagenav button:disabled{ opacity: 0.3; cursor: default; }
+  .pagenav button:not(:disabled):hover{ border-color: var(--gold); }
+
+  .preview-stage{
+    position: relative;
+    background: repeating-conic-gradient(#0F1524 0% 25%, #121933 0% 50%) 50% / 16px 16px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    padding: 18px;
+    user-select: none;
+    touch-action: none;
+  }
+  .preview-stage canvas{
+    display:block;
+    max-width: 100%;
+    height: auto;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+  }
+  .canvas-frame{ position: relative; display:inline-block; line-height:0; }
+
+  .side-label{
+    position: absolute;
+    top: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    border-radius: 2px;
+    color: #fff;
+    z-index: 3;
+  }
+  .side-label.left{ left: 8px; background: var(--es); }
+  .side-label.right{ right: 8px; background: var(--en); }
+
+  .split-line{
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 0;
+    border-left: 2px dashed rgba(245,239,225,0.85);
+    cursor: ew-resize;
+    z-index: 4;
+  }
+  .split-line::before, .split-line::after{
+    content: "";
+    position: absolute; left: 50%; transform: translateX(-50%);
+    width: 14px; height: 7px;
+    background: var(--ink);
+    border: 2px solid rgba(245,239,225,0.85);
+    border-radius: 0 0 8px 8px;
+  }
+  .split-line::before{ top: -1px; }
+  .split-line::after{ bottom: -1px; border-radius: 8px 8px 0 0; }
+  .split-handle{
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: var(--gold);
+    color: var(--ink);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+  }
+  .split-line:focus-visible{ outline: none; }
+  .split-line:focus-visible .split-handle{ outline: 2px solid #fff; outline-offset: 2px; }
+  .split-readout{
+    position: absolute; bottom: -1px; left: 50%; transform: translate(-50%, 100%);
+    margin-top: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-lo);
+    white-space: nowrap;
+    top: auto;
+  }
+
+  /* ---- controls row ---- */
+  .controls{
+    display:flex; align-items:center; gap: 22px; flex-wrap: wrap;
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(255,255,255,0.07);
+  }
+  .field{
+    display:flex; flex-direction: column; gap: 6px;
+  }
+  .field label{
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text-lo);
+  }
+  .pct-input{
+    display:flex; align-items:center; gap: 6px;
+  }
+  .pct-input input{
+    width: 64px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.14);
+    color: var(--text-hi);
+    font-family: var(--mono); font-size: 14px;
+    padding: 6px 8px;
+    border-radius: 3px;
+  }
+  .pct-input input:focus-visible{ outline: 2px solid var(--gold); }
+  .pct-input span{ font-family: var(--mono); color: var(--text-lo); font-size: 13px; }
+
+  .swap-toggle{
+    display:flex; align-items:center; gap: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 6px 6px 6px 14px;
+    cursor: pointer;
+    font-family: var(--mono); font-size: 12px;
+  }
+  .swap-toggle .tag{
+    padding: 3px 8px; border-radius: 12px; color: #fff; font-size: 11px;
+  }
+  .swap-toggle .tag.es{ background: var(--es); }
+  .swap-toggle .tag.en{ background: var(--en); }
+  .swap-toggle svg{ opacity: 0.7; }
+
+  .split-btn{
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    background: var(--gold);
+    color: var(--ink);
+    border: none;
+    padding: 12px 24px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background .15s ease, transform .1s ease;
+  }
+  .split-btn:hover:not(:disabled){ background: #D9AC5D; }
+  .split-btn:active:not(:disabled){ transform: scale(0.98); }
+  .split-btn:disabled{ opacity: 0.4; cursor: default; }
+
+  .tip{
+    font-size: 12.5px; color: var(--text-lo); margin-top: 14px;
+    font-style: normal;
+  }
+  .status-line{
+    font-family: var(--mono); font-size: 12.5px; color: var(--gold);
+    margin-top: 14px; min-height: 1em;
+  }
+
+  /* ---- results: ticket stubs ---- */
+  .results-head h2{
+    font-family: var(--mono); font-size: 13px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text-lo); margin: 0 0 16px; font-weight: 500;
+  }
+  .stubs{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 620px){ .stubs{ grid-template-columns: 1fr; } }
+
+  .stub{
+    background: var(--stub);
+    color: var(--ink-text);
+    border-radius: 4px;
+    padding: 20px;
+    position: relative;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.3);
+    animation: rise .35s ease both;
+  }
+  @media (prefers-reduced-motion: reduce){ .stub{ animation: none; } }
+  @keyframes rise{ from{ opacity:0; transform: translateY(10px);} to{opacity:1; transform:none;} }
+
+  .stub::after{
+    content: "";
+    position: absolute; top: 0; bottom: 0; right: -1px;
+    width: 0;
+    border-right: 2px dashed rgba(36,27,18,0.28);
+  }
+  .stub.en::after{ display: none; }
+
+  .stub .lang-tag{
+    display:inline-block;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+    color: #fff; padding: 3px 9px; border-radius: 2px; margin-bottom: 12px;
+  }
+  .stub.es .lang-tag{ background: var(--es); }
+  .stub.en .lang-tag{ background: var(--en); }
+
+  .stub .fname{
+    font-family: var(--mono); font-size: 13px; word-break: break-all;
+    margin-bottom: 4px; color: var(--ink-text);
+  }
+  .stub .meta{
+    font-size: 12px; color: var(--ink-text-dim); margin-bottom: 16px;
+  }
+  .stub .dl-btn{
+    width: 100%;
+    font-family: var(--mono); font-size: 12.5px; letter-spacing: 0.04em;
+    background: var(--ink);
+    color: var(--stub);
+    border: none;
+    padding: 10px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .stub .dl-btn:hover{ background: #26314F; }
+
+  .both-row{
+    margin-top: 16px;
+    display: flex; justify-content: center;
+  }
+  .zip-btn{
+    font-family: var(--mono); font-size: 12.5px;
+    background: none;
+    border: 1px solid rgba(255,255,255,0.18);
+    color: var(--text-lo);
+    padding: 10px 18px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .zip-btn:hover{ color: var(--text-hi); border-color: var(--gold); }
+
+  footer{
+    text-align: center; margin-top: 40px;
+    font-size: 12px; color: var(--text-lo); opacity: 0.6;
+    font-family: var(--mono);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Split the Hardcopy</h1>
+  <p class="sub">Upload a dual-language booking PDF. Drag the perforation to mark where one language ends and the other begins.</p>
+
+  <div class="card">
+    <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Upload PDF">
+      <div class="dz-title">Drop a PDF here, or click to browse</div>
+      <input type="file" id="fileInput" accept="application/pdf">
+    </div>
+    <div id="fileChip" class="file-chip hidden">
+      <span id="fileChipName"></span>
+      <button id="clearFile" type="button">remove</button>
+    </div>
+    <div id="errorMsg" class="error-msg hidden"></div>
+  </div>
+
+  <div id="previewCard" class="card hidden">
+    <div class="stage-head">
+      <h2>Position the split</h2>
+      <div class="pagenav">
+        <button id="prevPage" type="button" aria-label="Previous page">‹</button>
+        <span id="pageIndicator">Page 1 / 1</span>
+        <button id="nextPage" type="button" aria-label="Next page">›</button>
+      </div>
+    </div>
+
+    <div class="preview-stage" id="stage">
+      <div class="canvas-frame" id="canvasFrame">
+        <canvas id="pageCanvas"></canvas>
+        <div class="side-label left" id="labelLeft">ES</div>
+        <div class="side-label right" id="labelRight">EN</div>
+        <div class="split-line" id="splitLine" role="slider" tabindex="0"
+             aria-label="Split position" aria-valuemin="2" aria-valuemax="98" aria-valuenow="50">
+          <div class="split-handle">✂</div>
+          <div class="split-readout" id="splitReadout">50%</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="field">
+        <label for="pctInput">Split at</label>
+        <div class="pct-input">
+          <input type="number" id="pctInput" min="2" max="98" step="0.5" value="50">
+          <span>% from left</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Language sides</label>
+        <div class="swap-toggle" id="swapToggle" role="button" tabindex="0" aria-label="Swap which side is Spanish and which is English">
+          <span class="tag es" id="tagLeft">ES left</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          <span class="tag en" id="tagRight">EN right</span>
+        </div>
+      </div>
+
+      <button id="splitBtn" class="split-btn" type="button">Split PDF →</button>
+    </div>
+
+    <p class="tip">Tip: flip through a few pages with ‹ › before splitting — the divide should land in the same place on every page. Each language's content is scaled to A4 width (no distortion) and flows continuously across as many A4 pages as it needs — page count may differ from the original.</p>
+    <div class="status-line" id="statusLine"></div>
+  </div>
+
+  <div id="resultsCard" class="card hidden">
+    <div class="results-head"><h2>Done</h2></div>
+    <div class="stubs">
+      <div class="stub es">
+        <span class="lang-tag">SPANISH</span>
+        <div class="fname" id="esFname">—</div>
+        <div class="meta" id="esMeta">—</div>
+        <button class="dl-btn" id="esDlBtn" type="button">Download ES PDF</button>
+      </div>
+      <div class="stub en">
+        <span class="lang-tag">ENGLISH</span>
+        <div class="fname" id="enFname">—</div>
+        <div class="meta" id="enMeta">—</div>
+        <button class="dl-btn" id="enDlBtn" type="button">Download EN PDF</button>
+      </div>
+    </div>
+    <div class="both-row">
+      <button class="zip-btn" id="zipBtn" type="button">Download both as .zip</button>
+    </div>
+  </div>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const fileChip = document.getElementById('fileChip');
+const fileChipName = document.getElementById('fileChipName');
+const clearFileBtn = document.getElementById('clearFile');
+const errorMsg = document.getElementById('errorMsg');
+
+const previewCard = document.getElementById('previewCard');
+const resultsCard = document.getElementById('resultsCard');
+const stage = document.getElementById('stage');
+const canvas = document.getElementById('pageCanvas');
+const canvasFrame = document.getElementById('canvasFrame');
+const ctx = canvas.getContext('2d');
+
+const prevPageBtn = document.getElementById('prevPage');
+const nextPageBtn = document.getElementById('nextPage');
+const pageIndicator = document.getElementById('pageIndicator');
+
+const splitLine = document.getElementById('splitLine');
+const splitReadout = document.getElementById('splitReadout');
+const labelLeft = document.getElementById('labelLeft');
+const labelRight = document.getElementById('labelRight');
+const pctInput = document.getElementById('pctInput');
+const swapToggle = document.getElementById('swapToggle');
+const tagLeft = document.getElementById('tagLeft');
+const tagRight = document.getElementById('tagRight');
+const splitBtn = document.getElementById('splitBtn');
+const statusLine = document.getElementById('statusLine');
+
+const esFname = document.getElementById('esFname');
+const enFname = document.getElementById('enFname');
+const esMeta = document.getElementById('esMeta');
+const enMeta = document.getElementById('enMeta');
+const esDlBtn = document.getElementById('esDlBtn');
+const enDlBtn = document.getElementById('enDlBtn');
+const zipBtn = document.getElementById('zipBtn');
+
+let sourceBytes = null;      // Uint8Array, untouched original
+let baseName = 'document';
+let pdfPreviewDoc = null;    // pdfjs document, for preview only
+let numPages = 1;
+let currentPage = 1;
+let fraction = 0.5;          // split position, 0..1 from left
+let esOnLeft = true;
+let esBytesOut = null;
+let enBytesOut = null;
+
+// ---------- file intake ----------
+
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+});
+['dragover','dragenter'].forEach(evt => dropzone.addEventListener(evt, e => {
+  e.preventDefault(); dropzone.classList.add('drag');
+}));
+['dragleave','drop'].forEach(evt => dropzone.addEventListener(evt, e => {
+  e.preventDefault(); dropzone.classList.remove('drag');
+}));
+dropzone.addEventListener('drop', e => {
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+fileInput.addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  if (f) handleFile(f);
+});
+clearFileBtn.addEventListener('click', resetAll);
+
+function resetAll(){
+  sourceBytes = null; pdfPreviewDoc = null; numPages = 1; currentPage = 1;
+  fraction = 0.5; esOnLeft = true; esBytesOut = null; enBytesOut = null;
+  fileInput.value = '';
+  fileChip.classList.add('hidden');
+  previewCard.classList.add('hidden');
+  resultsCard.classList.add('hidden');
+  errorMsg.classList.add('hidden');
+}
+
+async function handleFile(file){
+  errorMsg.classList.add('hidden');
+  resultsCard.classList.add('hidden');
+  if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')){
+    showError('That doesn\u2019t look like a PDF. Please upload a .pdf file.');
+    return;
+  }
+  baseName = file.name.replace(/\.pdf$/i, '');
+  fileChipName.textContent = file.name + '  ·  ' + formatBytes(file.size);
+  fileChip.classList.remove('hidden');
+
+  try{
+    const buf = await file.arrayBuffer();
+    sourceBytes = new Uint8Array(buf);
+    await loadPreview(sourceBytes.slice());
+    previewCard.classList.remove('hidden');
+    resetSplitUI();
+    await renderPreviewPage(1);
+  }catch(err){
+    console.error(err);
+    showError('Couldn\u2019t open that PDF (' + err.message + '). It may be corrupted or password-protected.');
+  }
+}
+
+function showError(msg){
+  errorMsg.textContent = msg;
+  errorMsg.classList.remove('hidden');
+}
+
+function formatBytes(n){
+  if (n < 1024) return n + ' B';
+  if (n < 1024*1024) return (n/1024).toFixed(0) + ' KB';
+  return (n/1024/1024).toFixed(1) + ' MB';
+}
+
+// ---------- preview rendering ----------
+
+async function loadPreview(bytesCopy){
+  const task = pdfjsLib.getDocument({ data: bytesCopy });
+  pdfPreviewDoc = await task.promise;
+  numPages = pdfPreviewDoc.numPages;
+  currentPage = 1;
+  updatePageNav();
+}
+
+function resetSplitUI(){
+  fraction = 0.5;
+  esOnLeft = true;
+  pctInput.value = 50;
+  updateSwapUI();
+  positionSplitLine();
+}
+
+async function renderPreviewPage(n){
+  const page = await pdfPreviewDoc.getPage(n);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const baseViewport = page.getViewport({ scale: 1 });
+  const scale = (760 * dpr) / baseViewport.width; // fixed render resolution; CSS scales display responsively
+  const viewport = page.getViewport({ scale });
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  positionSplitLine();
+  updatePageNav();
+}
+
+function updatePageNav(){
+  pageIndicator.textContent = 'Page ' + currentPage + ' / ' + numPages;
+  prevPageBtn.disabled = currentPage <= 1;
+  nextPageBtn.disabled = currentPage >= numPages;
+}
+
+prevPageBtn.addEventListener('click', async () => {
+  if (currentPage > 1){ currentPage--; await renderPreviewPage(currentPage); }
+});
+nextPageBtn.addEventListener('click', async () => {
+  if (currentPage < numPages){ currentPage++; await renderPreviewPage(currentPage); }
+});
+
+// ---------- split line drag ----------
+
+function positionSplitLine(){
+  const pct = (fraction * 100);
+  splitLine.style.left = pct + '%';
+  splitReadout.textContent = pct.toFixed(1).replace(/\.0$/, '') + '%';
+  splitLine.setAttribute('aria-valuenow', pct.toFixed(0));
+  pctInput.value = round1(pct);
+}
+
+function round1(x){ return Math.round(x * 10) / 10; }
+
+function setFraction(f){
+  fraction = Math.min(0.98, Math.max(0.02, f));
+  positionSplitLine();
+}
+
+let dragging = false;
+splitLine.addEventListener('pointerdown', e => {
+  dragging = true;
+  splitLine.setPointerCapture(e.pointerId);
+});
+splitLine.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  const rect = canvasFrame.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  setFraction(x / rect.width);
+});
+splitLine.addEventListener('pointerup', e => {
+  dragging = false;
+  try{ splitLine.releasePointerCapture(e.pointerId); }catch(err){}
+});
+splitLine.addEventListener('keydown', e => {
+  const step = e.shiftKey ? 0.02 : 0.005;
+  if (e.key === 'ArrowLeft'){ e.preventDefault(); setFraction(fraction - step); }
+  if (e.key === 'ArrowRight'){ e.preventDefault(); setFraction(fraction + step); }
+});
+
+pctInput.addEventListener('input', () => {
+  const v = parseFloat(pctInput.value);
+  if (!isNaN(v)) setFraction(v / 100);
+});
+
+// ---------- swap toggle ----------
+
+swapToggle.addEventListener('click', toggleSwap);
+swapToggle.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggleSwap(); }
+});
+
+function toggleSwap(){
+  esOnLeft = !esOnLeft;
+  updateSwapUI();
+}
+
+function updateSwapUI(){
+  labelLeft.textContent = esOnLeft ? 'ES' : 'EN';
+  labelRight.textContent = esOnLeft ? 'EN' : 'ES';
+  labelLeft.style.background = esOnLeft ? 'var(--es)' : 'var(--en)';
+  labelRight.style.background = esOnLeft ? 'var(--en)' : 'var(--es)';
+  tagLeft.textContent = esOnLeft ? 'ES left' : 'EN left';
+  tagLeft.className = 'tag ' + (esOnLeft ? 'es' : 'en');
+  tagRight.textContent = esOnLeft ? 'EN right' : 'ES right';
+  tagRight.className = 'tag ' + (esOnLeft ? 'en' : 'es');
+}
+
+// ---------- split & export ----------
+
+splitBtn.addEventListener('click', doSplit);
+
+const A4_W = 595.28, A4_H = 841.89;
+
+// Returns a paginator that accepts embedded crops one at a time and streams
+// them onto A4 pages back-to-back, with no gaps and no forced page-per-crop —
+// a crop that doesn't fit in the remaining space just continues on a fresh
+// page, exactly like text reflowing past a page break.
+function createPaginator(doc, pageW, pageH){
+  let currentPage = null;
+  let offset = pageH; // start "full" so the first slice triggers a page
+
+  return {
+    addSlice(embed, scaledHeight){
+      let consumed = 0;
+      while (consumed < scaledHeight){
+        if (offset >= pageH){
+          currentPage = doc.addPage([pageW, pageH]);
+          offset = 0;
+        }
+        const spaceLeft = pageH - offset;
+        const drawH = Math.min(scaledHeight - consumed, spaceLeft);
+        const writeTopY = pageH - offset;
+        const placementTopY = writeTopY + consumed;
+        const placementBottomY = placementTopY - scaledHeight;
+        currentPage.drawPage(embed, { x: 0, y: placementBottomY, width: pageW, height: scaledHeight });
+        consumed += drawH;
+        offset += drawH;
+      }
+    },
+    pageCount(){ return doc.getPageCount(); }
+  };
+}
+
+async function doSplit(){
+  if (!sourceBytes){ return; }
+  splitBtn.disabled = true;
+  resultsCard.classList.add('hidden');
+  try{
+    const srcDoc = await PDFLib.PDFDocument.load(sourceBytes);
+    const esDoc = await PDFLib.PDFDocument.create();
+    const enDoc = await PDFLib.PDFDocument.create();
+    const pages = srcDoc.getPages();
+    if (pages.length === 0) throw new Error('This PDF has no pages.');
+
+    const esPaginator = createPaginator(esDoc, A4_W, A4_H);
+    const enPaginator = createPaginator(enDoc, A4_W, A4_H);
+
+    for (let i = 0; i < pages.length; i++){
+      statusLine.textContent = 'Stitching page ' + (i + 1) + ' of ' + pages.length + '…';
+      const page = pages[i];
+      const { width, height } = page.getSize();
+      const splitX = width * fraction;
+
+      const leftBox = { left: 0, bottom: 0, right: splitX, top: height };
+      const rightBox = { left: splitX, bottom: 0, right: width, top: height };
+      const esBox = esOnLeft ? leftBox : rightBox;
+      const enBox = esOnLeft ? rightBox : leftBox;
+
+      const esEmbed = await esDoc.embedPage(page, esBox);
+      const esScale = A4_W / esEmbed.width;
+      esPaginator.addSlice(esEmbed, esEmbed.height * esScale);
+
+      const enEmbed = await enDoc.embedPage(page, enBox);
+      const enScale = A4_W / enEmbed.width;
+      enPaginator.addSlice(enEmbed, enEmbed.height * enScale);
+    }
+
+    esBytesOut = await esDoc.save();
+    enBytesOut = await enDoc.save();
+
+    const esPages = esDoc.getPageCount();
+    const enPages = enDoc.getPageCount();
+    esFname.textContent = baseName + '_ES.pdf';
+    enFname.textContent = baseName + '_EN.pdf';
+    esMeta.textContent = esPages + ' page' + (esPages === 1 ? '' : 's') + ' · A4 · ' + formatBytes(esBytesOut.length);
+    enMeta.textContent = enPages + ' page' + (enPages === 1 ? '' : 's') + ' · A4 · ' + formatBytes(enBytesOut.length);
+
+    statusLine.textContent = 'Done — stitched into ' + esPages + ' ES page' + (esPages === 1 ? '' : 's') + ' and ' + enPages + ' EN page' + (enPages === 1 ? '' : 's') + '.';
+    resultsCard.classList.remove('hidden');
+    resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }catch(err){
+    console.error(err);
+    statusLine.textContent = '';
+    showError('Splitting failed — ' + err.message);
+  }finally{
+    splitBtn.disabled = false;
+  }
+}
+
+esDlBtn.addEventListener('click', () => downloadBytes(esBytesOut, baseName + '_ES.pdf'));
+enDlBtn.addEventListener('click', () => downloadBytes(enBytesOut, baseName + '_EN.pdf'));
+zipBtn.addEventListener('click', async () => {
+  if (!esBytesOut || !enBytesOut) return;
+  const zip = new JSZip();
+  zip.file(baseName + '_ES.pdf', esBytesOut);
+  zip.file(baseName + '_EN.pdf', enBytesOut);
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = baseName + '_split.zip';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+});
+
+function downloadBytes(bytes, filename){
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+</script>
+</body>
+</html>
