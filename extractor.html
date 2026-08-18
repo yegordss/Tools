@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thread Extractor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .bookmarklet-row{
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .bookmarklet-link{
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.03em;
+    background: var(--stub);
+    color: var(--ink-text);
+    border: 1.5px dashed var(--gold-dim);
+    padding: 10px 18px;
+    border-radius: 20px;
+    text-decoration: none;
+    cursor: grab;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bookmarklet-link:active{ cursor: grabbing; }
+  .drag-hint{
+    font-size: 12.5px;
+    color: var(--text-lo);
+  }
+  .drag-hint kbd{
+    font-family: var(--mono);
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-size: 11px;
+  }
+
+  .code-card{
+    padding: 0;
+    overflow: hidden;
+  }
+  .code-head{
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .code-head span{
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text-lo);
+  }
+  .copy-btn{
+    font-family: var(--mono); font-size: 12px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.14);
+    color: var(--text-hi);
+    padding: 5px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .copy-btn:hover{ border-color: var(--gold); }
+  .copy-btn.copied{ color: var(--gold); border-color: var(--gold); }
+  pre.code-block{
+    margin: 0;
+    padding: 20px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #D7DCE8;
+  }
+
+  .steps{
+    counter-reset: step;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .steps li{
+    position: relative;
+    padding-left: 34px;
+    margin-bottom: 14px;
+    font-size: 14px;
+    color: var(--text-lo);
+    line-height: 1.5;
+  }
+  .steps li::before{
+    counter-increment: step;
+    content: counter(step);
+    position: absolute; left: 0; top: -1px;
+    width: 22px; height: 22px;
+    background: var(--ink-panel-hi);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 50%;
+    color: var(--gold);
+    font-family: var(--mono); font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .steps li strong{ color: var(--text-hi); }
+  .steps li code{
+    font-family: var(--mono);
+    background: rgba(255,255,255,0.06);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 12.5px;
+  }
+
+  .note-box{
+    font-size: 13px;
+    color: var(--text-lo);
+    background: rgba(199,154,72,0.06);
+    border: 1px solid rgba(199,154,72,0.25);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-top: 18px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+<nav class="side-nav">
+  <a class="brand" href="index.html"><span class="snip">✂</span> Splitter</a>
+  <div class="side-nav-links">
+    <a href="index.html">Home</a>
+    <a href="splitter.html">Hardcopy Splitter</a>
+    <a href="extractor.html" class="current">Thread Extractor</a>
+    <a href="https://github.com/Shensson/SSTools" target="_blank" rel="noopener">Refund Calculator <span class="ext">↗</span></a>
+  </div>
+  <div class="side-nav-foot">Runs locally · nothing uploaded</div>
+</nav>
+
+<main class="main-content">
+<div class="wrap">
+
+  <p class="eyebrow">Bookmarklet</p>
+  <h1>Thread Extractor</h1>
+  <p class="sub">Pulls a clean copy of a conversation thread out of the page — clones it, strips the request-list panel, hidden nodes, icons, and the collapse / back / more-actions controls — then opens the result in its own tab.</p>
+
+  <div class="card">
+    <div class="bookmarklet-row">
+      <a class="bookmarklet-link" id="bookmarkletLink" href="#" title="Drag me to your bookmarks bar">📎 Extract Thread</a>
+      <span class="drag-hint">Drag this to your bookmarks bar — no install, nothing sent anywhere.</span>
+    </div>
+    <ol class="steps">
+      <li>Show your bookmarks bar (<kbd>Ctrl/Cmd</kbd> + <kbd>Shift</kbd> + <kbd>B</kbd>) if it isn't already visible.</li>
+      <li>Drag the <strong>📎 Extract Thread</strong> button above onto the bar.</li>
+      <li>On the page with the thread you want, click the bookmark. A new tab opens with just the cleaned-up thread.</li>
+    </ol>
+    <div class="note-box">Looks for an element matching <code>.history-thread-container</code> on the current page. If it's not found, nothing happens (check the browser console for a note).</div>
+  </div>
+
+  <div class="card code-card">
+    <div class="code-head">
+      <span>Source</span>
+      <button class="copy-btn" id="copyBtn" type="button">Copy</button>
+    </div>
+    <pre class="code-block" id="codeBlock"></pre>
+  </div>
+
+  <p class="sub" style="margin-bottom:0; font-size:13.5px;">Prefer running it by hand? Paste the code above into the browser console (DevTools → Console) on the page with the thread, and press Enter.</p>
+
+  <footer>Runs locally in your browser</footer>
+</div>
+</main>
+</div>
+
+<script>
+const snippetLines = [
+  '(function() {',
+  '    const el = document.querySelector(\'.history-thread-container\');',
+  '    if (!el) return console.error(\'No container found\');',
+  '    const clone = el.cloneNode(true);',
+  '    clone.querySelector(\'.request-list-component\')?.remove();',
+  '    clone.querySelectorAll(\'.mlap-hidden\').forEach(node => node.remove());',
+  '    clone.querySelectorAll(\'.material-icons\').forEach(node => node.remove());',
+  '    clone.querySelectorAll(\'.collapse-expand, .mlap-back-btn, .more-actions\').forEach(node => node.remove());',
+  '    clone.querySelectorAll(\'.thread-avatar-letter\').forEach(node => node.remove());',
+  '    const w = window.open("", "_blank", "width=800,height=600");',
+  '    w.document.write(`<html><head><title>Extracted Element</title></head><body>${clone.outerHTML}</body></html>`);',
+  '    w.document.close();',
+  '})()'
+];
+const snippet = snippetLines.join('\n');
+
+document.getElementById('codeBlock').textContent = snippet;
+document.getElementById('bookmarkletLink').href = 'javascript:' + encodeURIComponent(snippet);
+
+document.getElementById('copyBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('copyBtn');
+  try{
+    await navigator.clipboard.writeText(snippet);
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1600);
+  }catch(err){
+    btn.textContent = 'Select & copy manually';
+  }
+});
+</script>
+</body>
+</html>

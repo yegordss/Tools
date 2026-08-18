@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Refund Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .field{
+    margin-bottom: 20px;
+  }
+  .field label{
+    display: block;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-lo);
+    margin-bottom: 8px;
+  }
+  select, textarea, input[type="number"]{
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.14);
+    color: var(--text-hi);
+    font-family: var(--mono);
+    font-size: 13.5px;
+    padding: 10px 12px;
+    border-radius: 3px;
+  }
+  select:focus, textarea:focus, input[type="number"]:focus{
+    outline: 2px solid var(--gold);
+    outline-offset: 1px;
+  }
+  textarea{
+    resize: vertical;
+    line-height: 1.5;
+  }
+  textarea::placeholder{ color: rgba(199,204,218,0.4); }
+  select{
+    appearance: none;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8"><path d="M1 1l5 5 5-5" stroke="%23C79A48" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+  .penalty-row{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 560px){ .penalty-row{ grid-template-columns: 1fr; } }
+
+  .calc-btn{
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .results-head h2{
+    font-family: var(--mono); font-size: 13px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text-lo); margin: 0 0 16px; font-weight: 500;
+  }
+  .stubs{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 560px){ .stubs{ grid-template-columns: 1fr; } }
+  .stub{
+    background: var(--stub);
+    color: var(--ink-text);
+    border-radius: 4px;
+    padding: 18px 20px;
+  }
+  .stub .tag{
+    display:inline-block;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+    color: #fff; padding: 3px 9px; border-radius: 2px; margin-bottom: 10px;
+  }
+  .stub.refundable .tag{ background: var(--gold-dim); }
+  .stub.nonrefundable .tag{ background: var(--es); }
+  .stub pre{
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-height: 1.6em;
+    color: var(--ink-text);
+  }
+  .stub pre:empty::before{
+    content: "—";
+    color: var(--ink-text-dim);
+    font-weight: 400;
+  }
+  .total-line{
+    font-size: 22px;
+    font-weight: 700;
+    padding-top: 4px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    margin-top: 4px;
+  }
+  .total-line:empty{ display: none; }
+
+  .source-note{
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text-lo);
+    opacity: 0.6;
+    margin-top: 28px;
+  }
+  .source-note a{ color: var(--text-lo); }
+  .source-note a:hover{ color: var(--gold); }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+<nav class="side-nav">
+  <a class="brand" href="index.html"><span class="snip">✂</span> Splitter</a>
+  <div class="side-nav-links">
+    <a href="index.html">Home</a>
+    <a href="splitter.html">Hardcopy Splitter</a>
+    <a href="extractor.html">Thread Extractor</a>
+    <a href="calculator.html" class="current">Refund Calculator</a>
+  </div>
+  <div class="side-nav-foot">Runs locally · nothing uploaded</div>
+</nav>
+
+<main class="main-content">
+<div class="wrap">
+
+  <p class="eyebrow">Fare Breakdown</p>
+  <h1>Refund Calculator</h1>
+  <p class="sub">Paste an *LF fare breakdown, pick the refund type, and split the taxes into refundable vs. non-refundable — with penalty and no-show deductions where they apply.</p>
+
+  <div class="card">
+    <div class="field">
+      <label for="refundType">Refund Type</label>
+      <select id="refundType">
+        <option value="tax">Tax Refund</option>
+        <option value="normal">Normal Refund</option>
+        <option disabled value="partial">Partial Refund</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="breakdown">*LF Breakdown</label>
+      <textarea id="breakdown" rows="7" placeholder="FARE USD 478.00 TAX 5.60AY TAX 39.40US TAX 3.96XA TAX 4.50XF TAX 7.00XY TAX 6.11YC TAX 30.20JD TAX 2.10OG TAX 8.20QV TAX 400.00YQ TOT USD 985.07"></textarea>
+    </div>
+
+    <div class="penalty-row">
+      <div class="field" style="margin-bottom:0;">
+        <label for="penaltyInput">Penalty Amount (if applicable)</label>
+        <input type="number" id="penaltyInput">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label for="noShowPenaltyInput">No-Show Penalty (if applicable)</label>
+        <input type="number" id="noShowPenaltyInput">
+      </div>
+    </div>
+
+    <button id="calculate" class="btn-gold calc-btn" type="button">Calculate Refund</button>
+  </div>
+
+  <div class="results-head"><h2>Breakdown</h2></div>
+  <div class="card">
+    <div class="stubs">
+      <div class="stub refundable">
+        <span class="tag">REFUNDABLE</span>
+        <pre id="refundableTaxes"></pre>
+      </div>
+      <div class="stub nonrefundable">
+        <span class="tag">NON-REFUNDABLE</span>
+        <pre id="nonRefundableTaxes"></pre>
+      </div>
+    </div>
+    <p class="total-line" id="refundAmount"></p>
+  </div>
+
+  <p class="source-note">Ported from <a href="https://github.com/Shensson/SSTools" target="_blank" rel="noopener">github.com/Shensson/SSTools</a></p>
+
+  <footer>Runs locally in your browser</footer>
+</div>
+</main>
+</div>
+
+<script>
+var nonRefundableTaxCodesForTaxRefund = ["YQ", "YR", "US", "XF", "PI", "S4", "EQ", "E2", "ED", "L8", "O7", "I6", "N7", "N9", "PE", "CR", "BU", "DI", "FV", "FW", "BZ", "XL", "PH", "E3", "PA", "OU", "K3", "J9", "ZP"];
+var nonRefundableTaxCodesForNormalRefund = ["PI", "S4", "EQ", "E2", "ED", "L8", "O7", "I6", "N7", "N9", "PE", "CR", "BU", "DI", "FV", "FW", "BZ", "XL", "PH", "E3", "PA", "OU", "K3", "J9"];
+var selectedRefundType = 'tax'; // Default to 'tax'
+
+function setRefundType(refundType) {
+    selectedRefundType = refundType;
+}
+
+function calculateRefund() {
+    // Get the breakdown from the user input
+    var breakdown = document.getElementById("breakdown").value;
+    // Split the breakdown into individual items
+    var items = breakdown.split(/\s+/);
+    // Initialize refund amount
+    var refundAmount = 0.0;
+    // Initialize refundable and non-refundable tax breakdowns
+    var refundableTaxes = '';
+    var nonRefundableTaxes = '';
+    // Get the refund type
+    var refundType = document.getElementById("refundType").value;
+    // Find the fare amount
+    var fareAmount = 0.0;
+    for (var i = 0; i < items.length; i++) {
+        if (items[i] === "FARE") {
+            var amount = parseFloat(items[i + 2]);
+            if (!isNaN(amount)) {
+                fareAmount = amount;
+                break;
+            }
+        }
+    }
+    // Get the penalty input
+    var penaltyInput = document.getElementById("penaltyInput");
+    var penaltyAmount = parseFloat(penaltyInput.value) || 0;
+    // Get the "no-show" penalty input
+    var noShowPenaltyInput = document.getElementById("noShowPenaltyInput");
+    var noShowPenaltyAmount = parseFloat(noShowPenaltyInput.value) || 0;
+    // Calculate the refund based on the refund type and categorize taxes
+    for (var i = 0; i < items.length; i++) {
+        if (items[i] === "TAX") {
+            var taxCode = items[i + 1].slice(-2); // Extract the last two characters as the tax code
+            var amount = parseFloat(items[i + 1]);
+            if (!isNaN(amount) && taxCode) {
+                if ((refundType === "tax" && nonRefundableTaxCodesForTaxRefund.includes(taxCode)) ||
+                    (refundType === "normal" && nonRefundableTaxCodesForNormalRefund.includes(taxCode))) {
+                    nonRefundableTaxes += 'TAX ' + amount.toFixed(2) + taxCode + '\n';
+                } else {
+                    refundableTaxes += 'TAX ' + amount.toFixed(2) + taxCode + '\n';
+                    refundAmount += amount;
+                }
+            }
+        }
+    }
+    var refundableTaxesAmount = 0.0;
+    for (var i = 0; i < items.length; i++) {
+        if (items[i] === "TAX") {
+            var taxCode = items[i + 1].slice(-2); // Extract the last two characters as the tax code
+            var amount = parseFloat(items[i + 1]);
+            if (!isNaN(amount) && taxCode && !nonRefundableTaxCodesForTaxRefund.includes(taxCode)) {
+                refundableTaxesAmount += amount;
+            }
+        }
+    }
+    // Calculate the refund amount based on the refund type, including penalties
+    if (refundType === "normal") {
+        refundAmount = fareAmount - penaltyAmount - noShowPenaltyAmount;
+        if (refundAmount <= 0) {
+            refundAmount = '<span style="color: var(--es);">Not possible(Penalties higher than fare)</span>';
+        } else {
+            refundAmount += refundableTaxesAmount;
+        }
+    }
+    // Display the refundable and non-refundable tax breakdowns
+    document.getElementById("refundableTaxes").textContent = refundableTaxes;
+    document.getElementById("nonRefundableTaxes").textContent = nonRefundableTaxes;
+    // Display the refund amount
+    var refundAmountText = "Refund Amount: " + refundAmount;
+    var coloredRefundAmountText = refundAmountText.replace(/\d+\.\d+/, '<span style="color: var(--gold);">$&</span>');
+    document.getElementById("refundAmount").innerHTML = coloredRefundAmountText;
+}
+
+document.getElementById('calculate').addEventListener('click', calculateRefund);
+</script>
+</body>
+</html>
